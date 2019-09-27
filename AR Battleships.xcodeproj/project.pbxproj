@@ -8,22 +8,26 @@
 
 /* Begin PBXBuildFile section */
 		BD637B1D233E089E00DA8829 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD637B1C233E089E00DA8829 /* AppDelegate.swift */; };
-		BD637B1F233E089E00DA8829 /* art.scnassets in Resources */ = {isa = PBXBuildFile; fileRef = BD637B1E233E089E00DA8829 /* art.scnassets */; };
 		BD637B21233E089E00DA8829 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD637B20233E089E00DA8829 /* ViewController.swift */; };
 		BD637B24233E089E00DA8829 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BD637B22233E089E00DA8829 /* Main.storyboard */; };
 		BD637B26233E089F00DA8829 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BD637B25233E089F00DA8829 /* Assets.xcassets */; };
 		BD637B29233E089F00DA8829 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BD637B27233E089F00DA8829 /* LaunchScreen.storyboard */; };
+		BD637B31233E092100DA8829 /* BoardSquareAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD637B30233E092100DA8829 /* BoardSquareAnchor.swift */; };
+		BD637B33233E094600DA8829 /* BoardSquareNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD637B32233E094600DA8829 /* BoardSquareNode.swift */; };
+		BD637B35233E096600DA8829 /* BoardSquare.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD637B34233E096600DA8829 /* BoardSquare.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		BD637B19233E089E00DA8829 /* AR Battleships.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AR Battleships.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD637B1C233E089E00DA8829 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BD637B1E233E089E00DA8829 /* art.scnassets */ = {isa = PBXFileReference; lastKnownFileType = wrapper.scnassets; path = art.scnassets; sourceTree = "<group>"; };
 		BD637B20233E089E00DA8829 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		BD637B23233E089E00DA8829 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		BD637B25233E089F00DA8829 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BD637B28233E089F00DA8829 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		BD637B2A233E089F00DA8829 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BD637B30233E092100DA8829 /* BoardSquareAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSquareAnchor.swift; sourceTree = "<group>"; };
+		BD637B32233E094600DA8829 /* BoardSquareNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSquareNode.swift; sourceTree = "<group>"; };
+		BD637B34233E096600DA8829 /* BoardSquare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSquare.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,8 +44,8 @@
 		BD637B10233E089E00DA8829 = {
 			isa = PBXGroup;
 			children = (
-				BD637B1B233E089E00DA8829 /* AR Battleships */,
 				BD637B1A233E089E00DA8829 /* Products */,
+				BD637B1B233E089E00DA8829 /* AR Battleships */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,12 +61,14 @@
 			isa = PBXGroup;
 			children = (
 				BD637B1C233E089E00DA8829 /* AppDelegate.swift */,
-				BD637B1E233E089E00DA8829 /* art.scnassets */,
 				BD637B20233E089E00DA8829 /* ViewController.swift */,
 				BD637B22233E089E00DA8829 /* Main.storyboard */,
 				BD637B25233E089F00DA8829 /* Assets.xcassets */,
 				BD637B27233E089F00DA8829 /* LaunchScreen.storyboard */,
 				BD637B2A233E089F00DA8829 /* Info.plist */,
+				BD637B30233E092100DA8829 /* BoardSquareAnchor.swift */,
+				BD637B32233E094600DA8829 /* BoardSquareNode.swift */,
+				BD637B34233E096600DA8829 /* BoardSquare.swift */,
 			);
 			path = "AR Battleships";
 			sourceTree = "<group>";
@@ -125,7 +131,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BD637B1F233E089E00DA8829 /* art.scnassets in Resources */,
 				BD637B29233E089F00DA8829 /* LaunchScreen.storyboard in Resources */,
 				BD637B26233E089F00DA8829 /* Assets.xcassets in Resources */,
 				BD637B24233E089E00DA8829 /* Main.storyboard in Resources */,
@@ -139,8 +144,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD637B31233E092100DA8829 /* BoardSquareAnchor.swift in Sources */,
 				BD637B21233E089E00DA8829 /* ViewController.swift in Sources */,
 				BD637B1D233E089E00DA8829 /* AppDelegate.swift in Sources */,
+				BD637B33233E094600DA8829 /* BoardSquareNode.swift in Sources */,
+				BD637B35233E096600DA8829 /* BoardSquare.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
