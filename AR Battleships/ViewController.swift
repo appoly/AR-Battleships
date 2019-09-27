@@ -9,14 +9,21 @@
 import UIKit
 import SceneKit
 import ARKit
+import MultipeerConnectivity
 
-class ViewController: UIViewController, ARSCNViewDelegate {
+class ViewController: UIViewController {
 
     @IBOutlet var sceneView: ARSCNView!
     
     var nodes = [String : SCNNode]()
-    var myID: String?
+    var myID = MCPeerID(displayName: UIDevice.current.name) //Atm this obviously isn't 'secure' against screwing the game  up
+    var opponentID: MCPeerID?
+    
     let boxSize: Float = 0.25
+    
+    var multiplayerSession: MCSession!
+    var multiplayerServiceAdvertiser: MCNearbyServiceAdvertiser!
+    var multiplayerServiceBrowser: MCNearbyServiceBrowser!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -50,42 +57,25 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         generateAnchors()
     }
+    
+    func setupMultiplayer() {
+        let serviceType = "ar-battleships"
+        multiplayerSession = MCSession(peer: myID)
+        multiplayerSession.delegate = self
+        
+        multiplayerServiceAdvertiser = MCNearbyServiceAdvertiser(peer: myID, discoveryInfo: nil, serviceType: serviceType)
+        multiplayerServiceAdvertiser.delegate = self
+        multiplayerServiceAdvertiser.startAdvertisingPeer()
+        
+        multiplayerServiceBrowser = MCNearbyServiceBrowser(peer: myID, serviceType: serviceType)
+        multiplayerServiceBrowser.delegate = self
+        multiplayerServiceBrowser.startBrowsingForPeers()
+    }
 
-    // MARK: - ARSCNViewDelegate
     
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
-    }
-*/
-    
-    func session(_ session: ARSession, didFailWithError error: Error) {
-        // Present an error message to the user
-        
-    }
-    
-    func sessionWasInterrupted(_ session: ARSession) {
-        // Inform the user that the session has been interrupted, for example, by presenting an overlay
-        
-    }
-    
-    func sessionInterruptionEnded(_ session: ARSession) {
-        // Reset tracking and/or remove existing anchors if consistent tracking is required
-        
-    }
-    
-    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
-        guard let boardSquareAnchor = anchor as? BoardSquareAnchor else { return }
-        
-        addChildNode(forBoardSquareAnchor: boardSquareAnchor, withParentNode: node)
-    }
     
     
     func generateAnchors() {
-        myID = "Sean"
         //Test func at this point
         let gridSize = 8
         
@@ -93,19 +83,19 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             for k in 0..<gridSize {
                 let status: BoardSquare.Status
                 
-                if i == 7 {
+                if i == 6 {
                     status = .revealedNoShip
-                } else if i == 5 {
+                } else if i == 4 {
                     status = .revealedDestroyedShip
-                } else if i == 3 {
+                } else if i == 2 {
                     status = .revealedShip
-                } else if i == 1 {
+                } else if i == 0 {
                     status = .hiddenShip
                 } else {
                     status = .fogged
                 }
                 
-                let boardSquare = BoardSquare(ownerID: myID!, statusForOwner: status)
+                let boardSquare = BoardSquare(ownerID: myID.displayName, statusForOwner: status)
                 let position = BoardSquareAnchor.Position(i, k)
                 var transform = matrix_identity_float4x4
                 
@@ -124,8 +114,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     }
     
     func addChildNode(forBoardSquareAnchor boardSquareAnchor: BoardSquareAnchor, withParentNode parentNode: SCNNode) {
-        guard let nodeName = boardSquareAnchor.name,
-            let myID = myID else {
+        guard let nodeName = boardSquareAnchor.name else {
             print("Screwup")
             return
         }
@@ -134,7 +123,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             existingNode.removeFromParentNode() //Remove existing node from scene, it may have changed
         }
         
-        let box = createSCNBox(withBoardSquare: boardSquareAnchor.boardSquare, forID: myID)
+        let box = createSCNBox(withBoardSquare: boardSquareAnchor.boardSquare, forID: myID.displayName)
         let boxNode = SCNNode()
         boxNode.geometry = box
         nodes[nodeName] = boxNode
@@ -173,5 +162,76 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         box.firstMaterial?.diffuse.contents = colour
         
         return box
+    }
+}
+
+extension ViewController: ARSCNViewDelegate {
+    // MARK: - ARSCNViewDelegate
+        
+    /*
+        // Override to create and configure nodes for anchors added to the view's session.
+        func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+            let node = SCNNode()
+         
+            return node
+        }
+    */
+        
+        func session(_ session: ARSession, didFailWithError error: Error) {
+            // Present an error message to the user
+            
+        }
+        
+        func sessionWasInterrupted(_ session: ARSession) {
+            // Inform the user that the session has been interrupted, for example, by presenting an overlay
+            
+        }
+        
+        func sessionInterruptionEnded(_ session: ARSession) {
+            // Reset tracking and/or remove existing anchors if consistent tracking is required
+            
+        }
+        
+        func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+            guard let boardSquareAnchor = anchor as? BoardSquareAnchor else { return }
+            
+            addChildNode(forBoardSquareAnchor: boardSquareAnchor, withParentNode: node)
+        }
+}
+
+extension ViewController: MCSessionDelegate {
+    // MARK: - MCSessionDelegate
+    
+    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
+        if let anchor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: BoardSquareAnchor.self, from: data) {
+            sceneView.session.add(anchor: anchor)
+        }
+    }
+    
+    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {}
+    func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
+    func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
+    func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
+}
+
+extension ViewController: MCNearbyServiceAdvertiserDelegate {
+    // MARK: - MCNearbyServiceAdvertiserDelegate
+
+    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+        
+    }
+}
+
+extension ViewController: MCNearbyServiceBrowserDelegate {
+    // MARK: - MCNearbyServiceBrowserDelegate
+
+    func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
+        guard opponentID == nil else { return }
+    
+        browser.invitePeer(peerID, to: multiplayerSession, withContext: nil, timeout: 10)
+    }
+    
+    func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+        opponentID = nil
     }
 }
