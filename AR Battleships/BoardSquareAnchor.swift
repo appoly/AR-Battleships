@@ -55,7 +55,14 @@ class BoardSquareAnchor: ARAnchor {
     }
     
     required init(anchor: ARAnchor) {
-        fatalError("I'm too stupid to figure this bit out quickly and I'm kinda just assuming this won't be called like a 10/10 top tier programmer")
+        guard let boardSquareAnchor = anchor as? BoardSquareAnchor else {
+            fatalError("fk")
+        }
+        
+        boardSquare = boardSquareAnchor.boardSquare
+        position = boardSquareAnchor.position
+        
+        super.init(anchor: anchor)
     }
     
     override func encode(with coder: NSCoder) {
