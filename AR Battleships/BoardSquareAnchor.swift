@@ -66,12 +66,11 @@ class BoardSquareAnchor: ARAnchor {
     }
     
     override func encode(with coder: NSCoder) {
-        super.encode(with: coder)
-        
         coder.encode(boardSquare.ownerID, forKey: Keys.boardSquareOwnerIDKey)
         coder.encode(boardSquare.statusForOwner.rawValue, forKey: Keys.boardSquareStatusKey)
         coder.encode(position.x, forKey: Keys.positionXKey)
         coder.encode(position.y, forKey: Keys.positionYKey)
+        super.encode(with: coder)
     }
     
     static func generateName(fromBoardSquare boardSquare: BoardSquare, position: Position) -> String {

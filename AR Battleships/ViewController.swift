@@ -14,16 +14,62 @@ import MultipeerConnectivity
 class ViewController: UIViewController {
 
     @IBOutlet var sceneView: ARSCNView!
+    @IBOutlet weak var setupGameButton: UIButton!
+    @IBOutlet weak var infoLabel: UILabel!
+    
+    @IBAction func setupGameButton_TouchUpInside(_ sender: Any) {
+        if status == .broadcastingGame {
+            stopbroadcastingGame()
+        } else {
+            generateAnchors()
+            broadcastGame()
+        }
+    }
+    
+    enum Status {
+        case searchingForNearby
+        case broadcastingGame
+        case inGame
+    }
     
     var nodes = [String : SCNNode]()
+    var anchors = [String: BoardSquareAnchor]()
     var myID = MCPeerID(displayName: UIDevice.current.name) //Atm this obviously isn't 'secure' against screwing the game  up
     var opponentID: MCPeerID?
+    var isMapProvider: Bool = false
     
     let boxSize: Float = 0.25
     
-    var multiplayerSession: MCSession!
-    var multiplayerServiceAdvertiser: MCNearbyServiceAdvertiser!
-    var multiplayerServiceBrowser: MCNearbyServiceBrowser!
+    var multiplayerSession: MCSession?
+    var multiplayerServiceAdvertiser: MCNearbyServiceAdvertiser?
+    var multiplayerServiceBrowser: MCNearbyServiceBrowser?
+    
+    let serviceType = "ar-battleships"
+
+    var status: Status = .searchingForNearby {
+        didSet {
+            OperationQueue.main.addOperation {
+                switch self.status {
+                case .inGame:
+                    self.infoLabel.isHidden = true
+                    self.setupGameButton.isHidden = true
+                case .broadcastingGame:
+                    self.isMapProvider = true
+                    self.infoLabel.isHidden = false
+                    self.infoLabel.text = "Awaiting other players"
+                    self.setupGameButton.isHidden = false
+                    self.setupGameButton.setTitle("Cancel Setup", for: .normal)
+                default:
+                    self.isMapProvider = false
+                    self.opponentID = nil
+                    self.infoLabel.isHidden = false
+                    self.infoLabel.text = "Joining nearby games..."
+                    self.setupGameButton.isHidden = false
+                    self.setupGameButton.setTitle("Setup Game", for: .normal)
+                }
+            }
+        }
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,6 +79,8 @@ class ViewController: UIViewController {
         
         // Show statistics such as fps and timing information
         sceneView.showsStatistics = true
+        
+        reset()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -52,28 +100,94 @@ class ViewController: UIViewController {
         sceneView.session.pause()
     }
     
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        
-        generateAnchors()
-    }
-    
     func setupMultiplayer() {
-        let serviceType = "ar-battleships"
         multiplayerSession = MCSession(peer: myID)
-        multiplayerSession.delegate = self
-        
-        multiplayerServiceAdvertiser = MCNearbyServiceAdvertiser(peer: myID, discoveryInfo: nil, serviceType: serviceType)
-        multiplayerServiceAdvertiser.delegate = self
-        multiplayerServiceAdvertiser.startAdvertisingPeer()
+        multiplayerSession?.delegate = self
         
         multiplayerServiceBrowser = MCNearbyServiceBrowser(peer: myID, serviceType: serviceType)
-        multiplayerServiceBrowser.delegate = self
-        multiplayerServiceBrowser.startBrowsingForPeers()
+        multiplayerServiceBrowser?.delegate = self
+        multiplayerServiceBrowser?.startBrowsingForPeers()
+    }
+    
+    func broadcastGame() {
+        multiplayerServiceAdvertiser = MCNearbyServiceAdvertiser(peer: myID, discoveryInfo: nil, serviceType: serviceType)
+        multiplayerServiceAdvertiser?.delegate = self
+        multiplayerServiceAdvertiser?.startAdvertisingPeer()
+        
+        status = .broadcastingGame
+    }
+    
+    func sendDataIfProvider() {
+        if isMapProvider {
+            sceneView.session.getCurrentWorldMap { worldMap, error in
+                guard let map = worldMap else {
+                    print("Error generating map: \(error?.localizedDescription)")
+                    return
+                }
+                
+                do {
+                    let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: false)
+                    
+                    self.sendDataToOpponent(data: data)
+                } catch {
+                    print("Error sending map: \(error)")
+                }
+
+            }
+            self.sendAnchors()
+        }
+    }
+    
+    func sendAnchors() {
+        for anchor in anchors {
+            do {
+                let data = try NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: false)
+                
+                sendDataToOpponent(data: data)
+            } catch {
+                print("Couldn't archive bsanchor: \(error.localizedDescription)")
+            }
+            
+        }
+    }
+    
+    func sendDataToOpponent(data: Data) {
+        guard let opponentID = opponentID,
+            let multiplayerSession = multiplayerSession else {
+                return
+        }
+        
+        do {
+            try multiplayerSession.send(data, toPeers: [opponentID], with: .reliable)
+        } catch {
+            print("Data sending error: \(error.localizedDescription)")
+        }
     }
 
+    func stopbroadcastingGame() {
+        multiplayerServiceAdvertiser?.stopAdvertisingPeer()
+        multiplayerServiceAdvertiser = nil
+        
+        reset()
+    }
     
-    
+    func reset() {
+        for anchor in anchors.values {
+            sceneView.session.remove(anchor: anchor)
+        }
+        
+        for node in nodes.values {
+            node.removeFromParentNode()
+        }
+        
+        anchors.removeAll()
+        nodes.removeAll()
+        
+        status = .searchingForNearby
+        multiplayerSession?.disconnect()
+        multiplayerServiceBrowser?.stopBrowsingForPeers()
+        setupMultiplayer()
+    }
     
     func generateAnchors() {
         //Test func at this point
@@ -108,6 +222,8 @@ class ViewController: UIViewController {
                 transform.columns.3.z = (Float(k) * boxSize) + yGap
                 
                 let anchor = BoardSquareAnchor(boardSquare: boardSquare, position: position, transform: transform)
+                
+                anchors[anchor.name!] = anchor
                 sceneView.session.add(anchor: anchor)
             }
         }
@@ -167,48 +283,54 @@ class ViewController: UIViewController {
 
 extension ViewController: ARSCNViewDelegate {
     // MARK: - ARSCNViewDelegate
+    
+    func session(_ session: ARSession, didFailWithError error: Error) {}
+    func sessionWasInterrupted(_ session: ARSession) {}
+    func sessionInterruptionEnded(_ session: ARSession) {}
         
-    /*
-        // Override to create and configure nodes for anchors added to the view's session.
-        func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-            let node = SCNNode()
-         
-            return node
-        }
-    */
-        
-        func session(_ session: ARSession, didFailWithError error: Error) {
-            // Present an error message to the user
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        guard let boardSquareAnchor = anchor as? BoardSquareAnchor else { return }
             
-        }
-        
-        func sessionWasInterrupted(_ session: ARSession) {
-            // Inform the user that the session has been interrupted, for example, by presenting an overlay
-            
-        }
-        
-        func sessionInterruptionEnded(_ session: ARSession) {
-            // Reset tracking and/or remove existing anchors if consistent tracking is required
-            
-        }
-        
-        func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
-            guard let boardSquareAnchor = anchor as? BoardSquareAnchor else { return }
-            
-            addChildNode(forBoardSquareAnchor: boardSquareAnchor, withParentNode: node)
-        }
+        addChildNode(forBoardSquareAnchor: boardSquareAnchor, withParentNode: node)
+    }
 }
 
 extension ViewController: MCSessionDelegate {
     // MARK: - MCSessionDelegate
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        if let anchor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: BoardSquareAnchor.self, from: data) {
-            sceneView.session.add(anchor: anchor)
+        do {
+            if let worldMap = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) {
+                //re run session with new world map from other person
+                let configuration = ARWorldTrackingConfiguration()
+                configuration.planeDetection = .horizontal
+                configuration.initialWorldMap = worldMap
+                sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+            } else  if let anchor = try NSKeyedUnarchiver.unarchivedObject(ofClass: BoardSquareAnchor.self, from: data) {
+                sceneView.session.add(anchor: anchor)
+            } else {
+                print("Data was fucked")
+            }
+        } catch {
+            print("Data was fucked with error: \(error.localizedDescription)")
+        }
+        
+    }
+    
+    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
+        if peerID != myID {
+            switch state {
+            case .connected:
+                status = .inGame
+                sendDataIfProvider()
+            case .notConnected:
+                status = .searchingForNearby
+            default:
+                break
+            }
         }
     }
     
-    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {}
     func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
     func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
     func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
@@ -218,7 +340,13 @@ extension ViewController: MCNearbyServiceAdvertiserDelegate {
     // MARK: - MCNearbyServiceAdvertiserDelegate
 
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+        guard opponentID == nil else {
+            invitationHandler(false, multiplayerSession)
+            return
+        }
         
+        invitationHandler(true, multiplayerSession) //Accept any invitation automatically if no opponent
+        status = .inGame
     }
 }
 
@@ -226,12 +354,12 @@ extension ViewController: MCNearbyServiceBrowserDelegate {
     // MARK: - MCNearbyServiceBrowserDelegate
 
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
-        guard opponentID == nil else { return }
+        guard opponentID == nil, let multiplayerSession = multiplayerSession else { return }
     
         browser.invitePeer(peerID, to: multiplayerSession, withContext: nil, timeout: 10)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        opponentID = nil
+        status = .searchingForNearby
     }
 }
